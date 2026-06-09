@@ -10,10 +10,11 @@ import {
   todayIso,
 } from '@/shared/date'
 import { useUseCases } from '@/ui/di'
-import { showToast } from '@/ui/toast'
+import { showErrorToast, showToast } from '@/ui/toast'
 import BaseButton from '@/ui/components/base/BaseButton.vue'
 import BaseCard from '@/ui/components/base/BaseCard.vue'
 import ConfirmModal from '@/ui/components/base/ConfirmModal.vue'
+import LoadErrorCard from '@/ui/components/base/LoadErrorCard.vue'
 import ShoppingListView from '@/ui/components/ShoppingListView.vue'
 
 const {
@@ -26,6 +27,7 @@ const route = useRoute()
 
 const list = ref<ShoppingList | null>(null)
 const loaded = ref(false)
+const loadFailed = ref(false)
 const confirmingUncheckAll = ref(false)
 
 const checkedCount = computed(
@@ -54,41 +56,57 @@ const weekLabel = computed(() =>
     : '',
 )
 
-onMounted(async () => {
-  // Semaine affichée : celle demandée (?week=), sinon celle de la liste
-  // persistée tant qu'elle n'est pas passée, sinon la semaine courante.
-  const requestedWeek =
-    typeof route.query.week === 'string' && isValidIsoDate(route.query.week)
-      ? mondayOf(route.query.week)
-      : null
-  const currentMonday = mondayOf(todayIso())
-  const persisted = await getCurrentShoppingList.execute()
-  const weekStart =
-    requestedWeek ??
-    (persisted && persisted.weekStart >= currentMonday
-      ? persisted.weekStart
-      : currentMonday)
+async function load() {
+  loaded.value = false
+  loadFailed.value = false
+  try {
+    // Semaine affichée : celle demandée (?week=), sinon celle de la liste
+    // persistée tant qu'elle n'est pas passée, sinon la semaine courante.
+    const requestedWeek =
+      typeof route.query.week === 'string' && isValidIsoDate(route.query.week)
+        ? mondayOf(route.query.week)
+        : null
+    const currentMonday = mondayOf(todayIso())
+    const persisted = await getCurrentShoppingList.execute()
+    const weekStart =
+      requestedWeek ??
+      (persisted && persisted.weekStart >= currentMonday
+        ? persisted.weekStart
+        : currentMonday)
 
-  // Toujours recalculée depuis le plan : la liste reste à jour sans bouton,
-  // les coches de la même semaine sont conservées par le use case.
-  list.value = await generateShoppingList.execute(weekStart)
+    // Toujours recalculée depuis le plan : la liste reste à jour sans bouton,
+    // les coches de la même semaine sont conservées par le use case.
+    list.value = await generateShoppingList.execute(weekStart)
+  } catch {
+    loadFailed.value = true
+  }
   loaded.value = true
-})
+}
+
+onMounted(load)
 
 async function uncheckAll() {
   confirmingUncheckAll.value = false
-  const updated = await uncheckAllShoppingItems.execute()
-  if (updated) list.value = updated
-  showToast('Tous les articles sont à nouveau à acheter', '🧺')
+  try {
+    const updated = await uncheckAllShoppingItems.execute()
+    if (updated) list.value = updated
+    showToast('Tous les articles sont à nouveau à acheter', '🧺')
+  } catch {
+    showErrorToast('La liste n’a pas pu être mise à jour. Réessayez.')
+  }
 }
 
 async function handleToggle(item: ShoppingListItem, checked: boolean) {
-  const updated = await toggleShoppingItem.execute(
-    item.ingredientId,
-    item.unit,
-    checked,
-  )
-  if (updated) list.value = updated
+  try {
+    const updated = await toggleShoppingItem.execute(
+      item.ingredientId,
+      item.unit,
+      checked,
+    )
+    if (updated) list.value = updated
+  } catch {
+    showErrorToast('L’article n’a pas pu être mis à jour. Réessayez.')
+  }
 }
 
 function printList() {
@@ -144,6 +162,8 @@ function printList() {
       </div>
       <div class="skeleton order-first h-44 !rounded-[28px] lg:order-none"></div>
     </div>
+
+    <LoadErrorCard v-else-if="loadFailed" @retry="load" />
 
     <BaseCard
       v-else-if="!list || list.items.length === 0"

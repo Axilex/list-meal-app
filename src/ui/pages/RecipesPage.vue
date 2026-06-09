@@ -3,10 +3,11 @@ import { computed, onMounted, ref } from 'vue'
 import type { Recipe, RecipeDraft } from '@/domain/models'
 import { countLabel } from '@/shared/labels'
 import { useUseCases } from '@/ui/di'
-import { showToast } from '@/ui/toast'
+import { showErrorToast, showToast } from '@/ui/toast'
 import BaseButton from '@/ui/components/base/BaseButton.vue'
 import BaseCard from '@/ui/components/base/BaseCard.vue'
 import ConfirmModal from '@/ui/components/base/ConfirmModal.vue'
+import LoadErrorCard from '@/ui/components/base/LoadErrorCard.vue'
 import RecipeForm from '@/ui/components/RecipeForm.vue'
 import RecipeList from '@/ui/components/RecipeList.vue'
 import RecipePreviewModal from '@/ui/components/RecipePreviewModal.vue'
@@ -25,6 +26,8 @@ const previewing = ref<Recipe | null>(null)
 const deleting = ref<Recipe | null>(null)
 const formErrors = ref<string[]>([])
 const loaded = ref(false)
+const loadFailed = ref(false)
+const saving = ref(false)
 const search = ref('')
 
 // Recherche insensible aux accents et à la casse (« pates » trouve « Pâtes »)
@@ -39,9 +42,14 @@ const filteredRecipes = computed(() => {
 })
 
 async function reload() {
-  recipes.value = await getRecipes.execute()
-  const ingredients = await getIngredients.execute()
-  ingredientNameById.value = new Map(ingredients.map((i) => [i.id, i.name]))
+  loadFailed.value = false
+  try {
+    recipes.value = await getRecipes.execute()
+    const ingredients = await getIngredients.execute()
+    ingredientNameById.value = new Map(ingredients.map((i) => [i.id, i.name]))
+  } catch {
+    loadFailed.value = true
+  }
   loaded.value = true
 }
 
@@ -80,24 +88,38 @@ function startEdit(recipe: Recipe) {
 }
 
 async function handleSave(draft: RecipeDraft) {
-  const result = await saveRecipe.execute(draft)
-  if (result.ok) {
-    const created = !draft.id
-    editing.value = null
-    formErrors.value = []
-    await reload()
-    showToast(created ? 'Recette ajoutée au carnet' : 'Recette mise à jour', '✅')
-  } else {
-    formErrors.value = result.errors
+  if (saving.value) return
+  saving.value = true
+  try {
+    const result = await saveRecipe.execute(draft)
+    if (result.ok) {
+      const created = !draft.id
+      editing.value = null
+      formErrors.value = []
+      await reload()
+      showToast(created ? 'Recette ajoutée au carnet' : 'Recette mise à jour', '✅')
+    } else {
+      formErrors.value = result.errors
+    }
+  } catch {
+    showErrorToast('La recette n’a pas pu être enregistrée. Réessayez.')
+  } finally {
+    saving.value = false
   }
 }
 
 async function confirmDelete() {
   if (!deleting.value) return
-  await deleteRecipe.execute(deleting.value.id)
+  const recipe = deleting.value
+  // Fermée tout de suite : pas de second clic possible pendant l'écriture
   deleting.value = null
-  await reload()
-  showToast('Recette supprimée', '🗑️')
+  try {
+    await deleteRecipe.execute(recipe.id)
+    await reload()
+    showToast('Recette supprimée', '🗑️')
+  } catch {
+    showErrorToast('La recette n’a pas pu être supprimée. Réessayez.')
+  }
 }
 </script>
 
@@ -109,6 +131,7 @@ async function confirmDelete() {
         :draft="editing"
         :errors="formErrors"
         :ingredient-names="ingredientNames"
+        :saving="saving"
         @save="handleSave"
         @cancel="editing = null"
       />
@@ -155,7 +178,9 @@ async function confirmDelete() {
         />
       </label>
 
-      <BaseCard v-if="loaded && recipes.length === 0" class="py-14 text-center">
+      <LoadErrorCard v-if="loadFailed" @retry="reload" />
+
+      <BaseCard v-else-if="loaded && recipes.length === 0" class="py-14 text-center">
         <div
           class="mx-auto mb-5 grid size-20 place-items-center rounded-full bg-olive-100 text-4xl"
           aria-hidden="true"

@@ -11,6 +11,8 @@ const props = defineProps<{
   errors: string[]
   /** Noms d'ingrédients existants, proposés en autocomplétion. */
   ingredientNames: string[]
+  /** Écriture en cours : neutralise la soumission pour éviter un double envoi. */
+  saving?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -158,7 +160,9 @@ function removeStepRow(index: number) {
 
     <div class="flex justify-end gap-2 border-t border-line pt-4">
       <BaseButton variant="secondary" @click="emit('cancel')">Annuler</BaseButton>
-      <BaseButton variant="primary" type="submit">Enregistrer</BaseButton>
+      <BaseButton variant="primary" type="submit" :disabled="saving">
+        {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
+      </BaseButton>
     </div>
   </form>
 </template>

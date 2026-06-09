@@ -5,8 +5,10 @@ import type { MealPlan, MealSlot, MealType, Recipe } from '@/domain/models'
 import { addDays, formatShortDate, mondayOf, todayIso, weekDates } from '@/shared/date'
 import { countLabel } from '@/shared/labels'
 import { useUseCases } from '@/ui/di'
+import { showErrorToast } from '@/ui/toast'
 import BaseButton from '@/ui/components/base/BaseButton.vue'
 import BaseCard from '@/ui/components/base/BaseCard.vue'
+import LoadErrorCard from '@/ui/components/base/LoadErrorCard.vue'
 import MealPlanCalendar from '@/ui/components/MealPlanCalendar.vue'
 import MealSlotModal from '@/ui/components/MealSlotModal.vue'
 
@@ -25,6 +27,8 @@ const plan = ref<MealPlan | null>(null)
 const recipes = ref<Recipe[]>([])
 const ingredientNameById = ref(new Map<string, string>())
 const loaded = ref(false)
+const loadFailed = ref(false)
+const saving = ref(false)
 const editing = ref<{ date: string; mealType: MealType } | null>(null)
 // Sens du glissement quand on change de semaine ('next' | 'prev')
 const weekDirection = ref<'next' | 'prev'>('next')
@@ -51,13 +55,21 @@ const editingSlot = computed<MealSlot | null>(() => {
   )
 })
 
-onMounted(async () => {
-  plan.value = await getCurrentMealPlan.execute()
-  recipes.value = await getRecipes.execute()
-  const ingredients = await getIngredients.execute()
-  ingredientNameById.value = new Map(ingredients.map((i) => [i.id, i.name]))
+async function load() {
+  loaded.value = false
+  loadFailed.value = false
+  try {
+    plan.value = await getCurrentMealPlan.execute()
+    recipes.value = await getRecipes.execute()
+    const ingredients = await getIngredients.execute()
+    ingredientNameById.value = new Map(ingredients.map((i) => [i.id, i.name]))
+  } catch {
+    loadFailed.value = true
+  }
   loaded.value = true
-})
+}
+
+onMounted(load)
 
 function shiftWeek(direction: 1 | -1) {
   weekDirection.value = direction === 1 ? 'next' : 'prev'
@@ -70,17 +82,33 @@ function goToCurrentWeek() {
 }
 
 async function handleSave(slot: MealSlot) {
-  const result = await saveMealSlot.execute(slot)
-  if (result.ok) {
-    plan.value = result.plan
-    editing.value = null
+  if (saving.value) return
+  saving.value = true
+  try {
+    const result = await saveMealSlot.execute(slot)
+    if (result.ok) {
+      plan.value = result.plan
+      editing.value = null
+    }
+  } catch {
+    showErrorToast('Le repas n’a pas pu être enregistré. Réessayez.')
+  } finally {
+    saving.value = false
   }
 }
 
 async function handleRemove(slotId: string) {
-  const updated = await removeMealSlot.execute(slotId)
-  if (updated) plan.value = updated
-  editing.value = null
+  if (saving.value) return
+  saving.value = true
+  try {
+    const updated = await removeMealSlot.execute(slotId)
+    if (updated) plan.value = updated
+    editing.value = null
+  } catch {
+    showErrorToast('Le repas n’a pas pu être retiré. Réessayez.')
+  } finally {
+    saving.value = false
+  }
 }
 
 function goToShoppingList() {
@@ -152,7 +180,9 @@ function goToShoppingList() {
       </span>
     </div>
 
-    <BaseCard v-if="loaded && recipes.length === 0" class="py-14 text-center">
+    <LoadErrorCard v-if="loadFailed" @retry="load" />
+
+    <BaseCard v-else-if="loaded && recipes.length === 0" class="py-14 text-center">
       <div
         class="mx-auto mb-5 grid size-20 place-items-center rounded-full bg-olive-100 text-4xl"
         aria-hidden="true"
@@ -203,6 +233,7 @@ function goToShoppingList() {
       :slot="editingSlot"
       :recipes="recipes"
       :ingredient-name-by-id="ingredientNameById"
+      :saving="saving"
       @save="handleSave"
       @remove="handleRemove"
       @close="editing = null"

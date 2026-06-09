@@ -20,11 +20,13 @@ import {
 import type { AuthGateway } from './application/auth/AuthGateway'
 import {
   DeleteRecipeUseCase,
+  ExportDataUseCase,
   GenerateShoppingListUseCase,
   GetCurrentMealPlanUseCase,
   GetCurrentShoppingListUseCase,
   GetIngredientsUseCase,
   GetRecipesUseCase,
+  ImportDataUseCase,
   RemoveMealSlotUseCase,
   SaveMealSlotUseCase,
   SaveRecipeUseCase,
@@ -85,5 +87,17 @@ export function createUseCases(): UseCases {
     getCurrentShoppingList: new GetCurrentShoppingListUseCase(shoppingListRepo),
     toggleShoppingItem: new ToggleShoppingItemUseCase(shoppingListRepo),
     uncheckAllShoppingItems: new UncheckAllShoppingItemsUseCase(shoppingListRepo),
+    exportData: new ExportDataUseCase(
+      recipeRepo,
+      ingredientRepo,
+      mealPlanRepo,
+      shoppingListRepo,
+    ),
+    importData: new ImportDataUseCase(
+      recipeRepo,
+      ingredientRepo,
+      mealPlanRepo,
+      shoppingListRepo,
+    ),
   }
 }

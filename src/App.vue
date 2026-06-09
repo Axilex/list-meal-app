@@ -2,7 +2,9 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 import type { AuthUser } from '@/application/auth/AuthGateway'
-import { useAuthGateway } from '@/ui/di'
+import { todayIso } from '@/shared/date'
+import { useAuthGateway, useUseCases } from '@/ui/di'
+import { showErrorToast, showToast } from '@/ui/toast'
 import LoginPage from '@/ui/pages/LoginPage.vue'
 import ConfirmModal from '@/ui/components/base/ConfirmModal.vue'
 import ToastHost from '@/ui/components/base/ToastHost.vue'
@@ -41,6 +43,58 @@ const confirmingSignOut = ref(false)
 async function handleSignOut() {
   confirmingSignOut.value = false
   await auth?.signOut()
+}
+
+// Sauvegarde et restauration : un fichier JSON téléchargé, réimportable
+// (changement de navigateur, migration localStorage → Firebase…).
+const { exportData, importData } = useUseCases()
+const importFileInput = ref<HTMLInputElement | null>(null)
+const pendingImport = ref<unknown | null>(null)
+
+async function downloadExport() {
+  try {
+    const data = await exportData.execute()
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: 'application/json',
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `mes-repas-${todayIso()}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+    showToast('Données exportées', '📦')
+  } catch {
+    showErrorToast('L’export a échoué. Réessayez.')
+  }
+}
+
+async function onImportFileChosen(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = '' // permet de resélectionner le même fichier plus tard
+  if (!file) return
+  try {
+    pendingImport.value = JSON.parse(await file.text())
+  } catch {
+    showErrorToast('Ce fichier n’est pas un export valide de l’application.')
+  }
+}
+
+async function confirmImport() {
+  const data = pendingImport.value
+  pendingImport.value = null
+  try {
+    const result = await importData.execute(data)
+    if (result.ok) {
+      // Recharge pour que toutes les pages relisent les données importées
+      window.location.reload()
+    } else {
+      showErrorToast(result.error)
+    }
+  } catch {
+    showErrorToast('L’import a échoué. Réessayez.')
+  }
 }
 </script>
 
@@ -100,13 +154,40 @@ async function handleSignOut() {
     </main>
 
     <footer class="no-print mx-auto w-full max-w-[1060px] px-5 pb-24 sm:pb-8">
-      <p class="border-t border-line pt-3 text-xs text-ink-faint">
-        {{
-          auth
-            ? 'Vos recettes, plans et listes sont synchronisés via Firebase et partagés entre les appareils connectés.'
-            : 'Vos recettes, plans et listes sont conservés localement dans ce navigateur.'
-        }}
-      </p>
+      <div
+        class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-line pt-3"
+      >
+        <p class="text-xs text-ink-faint">
+          {{
+            auth
+              ? 'Vos recettes, plans et listes sont synchronisés via Firebase et partagés entre les appareils connectés.'
+              : 'Vos recettes, plans et listes sont conservés localement dans ce navigateur.'
+          }}
+        </p>
+        <p class="flex gap-4">
+          <button
+            type="button"
+            class="cursor-pointer text-xs font-medium text-ink-faint underline-offset-2 hover:text-ink hover:underline"
+            @click="downloadExport"
+          >
+            📦 Exporter les données
+          </button>
+          <button
+            type="button"
+            class="cursor-pointer text-xs font-medium text-ink-faint underline-offset-2 hover:text-ink hover:underline"
+            @click="importFileInput?.click()"
+          >
+            📥 Importer
+          </button>
+        </p>
+      </div>
+      <input
+        ref="importFileInput"
+        type="file"
+        accept="application/json,.json"
+        class="hidden"
+        @change="onImportFileChosen"
+      />
     </footer>
 
     <!-- Barre d'onglets mobile : gros points de contact, pouce-friendly -->
@@ -135,6 +216,16 @@ async function handleSignOut() {
       emoji="👋"
       @confirm="handleSignOut"
       @close="confirmingSignOut = false"
+    />
+
+    <ConfirmModal
+      v-if="pendingImport !== null"
+      title="Importer ces données ?"
+      message="Les recettes et ingrédients du fichier seront ajoutés (ceux portant le même identifiant seront remplacés), puis la page se rechargera."
+      confirm-label="Importer"
+      emoji="📥"
+      @confirm="confirmImport"
+      @close="pendingImport = null"
     />
 
     <ToastHost />

@@ -19,7 +19,11 @@ const checkedItems = computed(() =>
 )
 
 function onToggle(item: ShoppingListItem, event: Event) {
-  emit('toggle', item, (event.target as HTMLInputElement).checked)
+  const input = event.target as HTMLInputElement
+  const checked = input.checked
+  // La case reflète l'état persisté : si l'écriture échoue, elle ne bouge pas
+  input.checked = item.checked
+  emit('toggle', item, checked)
 }
 </script>
 

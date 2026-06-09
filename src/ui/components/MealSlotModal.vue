@@ -16,6 +16,8 @@ const props = defineProps<{
   slot: MealSlot | null
   recipes: Recipe[]
   ingredientNameById: Map<string, string>
+  /** Écriture en cours : neutralise les actions pour éviter un double envoi. */
+  saving?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -145,6 +147,7 @@ function save() {
         v-if="slot"
         variant="danger"
         class="mr-auto"
+        :disabled="saving"
         @click="emit('remove', slot.id)"
       >
         Retirer ce repas
@@ -152,10 +155,10 @@ function save() {
       <BaseButton variant="secondary" @click="emit('close')">Annuler</BaseButton>
       <BaseButton
         variant="primary"
-        :disabled="recipeId === '' || !(servings > 0)"
+        :disabled="recipeId === '' || !(servings > 0) || saving"
         @click="save"
       >
-        Enregistrer
+        {{ saving ? 'Enregistrement…' : 'Enregistrer' }}
       </BaseButton>
     </div>
   </ModalShell>

@@ -2,11 +2,13 @@ import { inject, type InjectionKey } from 'vue'
 import type { AuthGateway } from '@/application/auth/AuthGateway'
 import type {
   DeleteRecipeUseCase,
+  ExportDataUseCase,
   GenerateShoppingListUseCase,
   GetCurrentMealPlanUseCase,
   GetCurrentShoppingListUseCase,
   GetIngredientsUseCase,
   GetRecipesUseCase,
+  ImportDataUseCase,
   RemoveMealSlotUseCase,
   SaveMealSlotUseCase,
   SaveRecipeUseCase,
@@ -28,6 +30,8 @@ export interface UseCases {
   getCurrentShoppingList: GetCurrentShoppingListUseCase
   toggleShoppingItem: ToggleShoppingItemUseCase
   uncheckAllShoppingItems: UncheckAllShoppingItemsUseCase
+  exportData: ExportDataUseCase
+  importData: ImportDataUseCase
 }
 
 export const USE_CASES: InjectionKey<UseCases> = Symbol('useCases')

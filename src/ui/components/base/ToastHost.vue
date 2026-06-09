@@ -13,7 +13,8 @@ import { dismissToast, toasts } from '@/ui/toast'
         v-for="toast in toasts"
         :key="toast.id"
         type="button"
-        class="pointer-events-auto flex cursor-pointer items-center gap-2 rounded-full bg-ink px-4 py-2.5 font-display text-sm font-bold text-white shadow-modal"
+        class="pointer-events-auto flex cursor-pointer items-center gap-2 rounded-full px-4 py-2.5 font-display text-sm font-bold text-white shadow-modal"
+        :class="toast.tone === 'error' ? 'bg-brick-600' : 'bg-ink'"
         @click="dismissToast(toast.id)"
       >
         <span v-if="toast.emoji" aria-hidden="true">{{ toast.emoji }}</span>
