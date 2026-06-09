@@ -1,0 +1,6 @@
+// Étape de préparation : action préremplie (Couper, Cuire…) + détail libre.
+export interface RecipeStep {
+  action: string // "Couper", "Faire revenir", "Servir"…
+  detail?: string // "le poulet en dés", "10 min à feu vif"…
+  durationMin?: number // durée indicative en minutes
+}

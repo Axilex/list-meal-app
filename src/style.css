@@ -1,0 +1,170 @@
+@import "tailwindcss";
+
+/*
+ * Thème « culinaire premium » (spec specification-vue-liste-courses.md) :
+ * fond crème rosé très pâle, grandes cartes blanches arrondies (28px) aux
+ * ombres diffuses, CTA corail à ombre dure 3D, couleurs bonbon conservées
+ * pour l'identité des recettes, Baloo 2 (titres ronds) + Nunito (texte).
+ * Les noms de tokens historiques sont conservés comme API sémantique
+ * (paper = fond de page, cream = surface, ink = texte, olive = accent
+ * primaire — désormais corail —, brick = rouge d'alerte) — seules les
+ * valeurs changent. noon/night = codes couleur des repas (midi / soir).
+ */
+@theme {
+  --font-display: "Baloo 2", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Nunito", "Segoe UI", system-ui, sans-serif;
+
+  --color-paper: #fbf4ec;
+  --color-cream: #fffdfb;
+  --color-ink: #241f31;
+  --color-ink-soft: #7b7484;
+  --color-ink-faint: #a59dab;
+  --color-line: rgba(36, 31, 49, 0.08);
+  --color-line-strong: rgba(36, 31, 49, 0.16);
+
+  /* Accent primaire corail (nom « olive » conservé pour limiter le diff) */
+  --color-olive-50: #fff1ed;
+  --color-olive-100: #ffe2d9;
+  --color-olive-200: #ffc5b5;
+  --color-olive-300: #ffa18a;
+  --color-olive-400: #ff8266;
+  --color-olive-500: #ff6247;
+  --color-olive-600: #f0553c;
+  --color-olive-700: #d03a26;
+  --color-olive-800: #a82e1e;
+  --color-olive-900: #842417;
+
+  /* Framboise d'alerte (distincte du corail primaire) */
+  --color-brick-50: #fff0f3;
+  --color-brick-200: #ffc2d0;
+  --color-brick-600: #e5345f;
+  --color-brick-700: #c01f49;
+
+  /* Mandarine (barre de progression) */
+  --color-tangerine-400: #ff9e2c;
+
+  /* Codes couleur des repas */
+  --color-noon-50: #fff1d6;
+  --color-noon-700: #b85e00;
+  --color-night-50: #efe6ff;
+  --color-night-700: #5b2fc0;
+
+  /* Ombre diffuse chaude (cartes), halo corail au survol, ombre dure 3D (CTA) */
+  --shadow-soft: 0 10px 30px rgba(120, 92, 64, 0.1);
+  --shadow-lift:
+    0 6px 14px rgba(208, 58, 38, 0.14), 0 16px 40px rgba(120, 92, 64, 0.16);
+  --shadow-modal:
+    0 12px 24px rgba(36, 31, 49, 0.1), 0 32px 80px rgba(36, 31, 49, 0.24);
+  --shadow-button: 0 6px 0 rgba(208, 58, 38, 0.85);
+
+  /* Rayon signature des grandes cartes */
+  --radius-card: 28px;
+
+  /* Ressort partagé des micro-interactions */
+  --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@layer base {
+  body {
+    @apply bg-paper font-body text-ink antialiased;
+  }
+
+  ::selection {
+    @apply bg-olive-200 text-ink;
+  }
+}
+
+@layer components {
+  /* Étiquette en petites capitales espacées */
+  .eyebrow {
+    @apply text-[11px] font-bold tracking-[0.1em] text-ink-faint uppercase;
+  }
+
+  .nav-link {
+    @apply rounded-full px-3.5 py-1.5 text-sm font-bold text-ink-soft transition-all duration-150 hover:bg-olive-100 hover:text-olive-700;
+    font-family: var(--font-display);
+    transition-timing-function: var(--ease-pop);
+  }
+
+  .nav-link.router-link-exact-active {
+    @apply bg-olive-500 text-white;
+    box-shadow: 0 2px 0 var(--color-olive-700);
+  }
+
+  /* Pastille type de repas (midi / soir) */
+  .meal-badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-[0.04em] uppercase;
+    font-family: var(--font-display);
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-[11px] font-bold tracking-[0.06em] text-ink-soft uppercase;
+    font-family: var(--font-display);
+  }
+
+  .field-control {
+    @apply w-full rounded-2xl border-2 border-line-strong bg-cream px-4 py-2.5 text-sm text-ink transition-all duration-150 placeholder:text-ink-faint focus:border-olive-400 focus:ring-4 focus:ring-olive-500/20 focus:outline-none;
+  }
+
+  .field-select {
+    @apply cursor-pointer appearance-none bg-no-repeat pr-9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23e23a28' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round' d='M4 6.5l4 4 4-4'/%3E%3C/svg%3E");
+    background-position: right 0.7rem center;
+    background-size: 14px;
+  }
+
+  /* Case à cocher dessinée (reste un vrai <input type="checkbox">) */
+  .checkbox {
+    @apply size-[20px] shrink-0 cursor-pointer appearance-none rounded-[7px] border-2 border-line-strong bg-cream transition-all duration-150;
+  }
+
+  .checkbox:hover {
+    @apply border-olive-400;
+  }
+
+  .checkbox:checked {
+    @apply border-olive-600 bg-olive-500 bg-center bg-no-repeat;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round' d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E");
+    background-size: 13px 13px;
+  }
+}
+
+/* Apparition des modales (entrée à ressort) */
+@keyframes modal-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.94);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-backdrop {
+  animation: modal-fade 160ms ease-out;
+}
+
+.modal-panel {
+  animation: modal-rise 260ms var(--ease-pop);
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+  }
+}
