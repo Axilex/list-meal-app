@@ -27,8 +27,10 @@ const slotByCell = computed(() => {
 })
 
 const days = computed(() =>
-  weekDates(props.weekStart).map((date) => ({
+  weekDates(props.weekStart).map((date, index) => ({
     date,
+    isPast: date < today,
+    isWeekend: index >= 5,
     cells: MEAL_TYPES.map((mealType) => ({
       mealType,
       slot: slotByCell.value.get(`${date}|${mealType}`) ?? null,
@@ -59,11 +61,14 @@ function visualFor(recipeId: string) {
             : '',
           day.date === today
             ? 'bg-gradient-to-b from-olive-50 via-olive-50/40 to-transparent'
-            : '',
+            : day.isWeekend
+              ? 'bg-paper/50'
+              : '',
         ]"
       >
         <div
           class="flex flex-wrap items-baseline gap-x-2 px-1 pt-1 min-[840px]:block min-[840px]:text-center"
+          :class="day.isPast ? 'opacity-55' : ''"
         >
           <div class="eyebrow" :class="day.date === today ? 'text-olive-600' : ''">
             {{ formatWeekday(day.date) }}
@@ -88,11 +93,13 @@ function visualFor(recipeId: string) {
             :key="cell.mealType"
             type="button"
             class="flex min-h-[104px] cursor-pointer flex-col items-start gap-1.5 rounded-2xl border-2 px-2.5 py-2.5 text-left transition-all duration-150 ease-pop"
-            :class="
+            :class="[
               cell.slot
                 ? 'shadow-soft hover:-translate-y-1 hover:-rotate-1 hover:shadow-lift'
-                : 'border-dashed border-line-strong hover:border-olive-300 hover:bg-olive-50'
-            "
+                : 'group border-dashed border-line-strong hover:border-olive-300 hover:bg-olive-50',
+              day.isPast && !cell.slot ? 'opacity-55 hover:opacity-100' : '',
+              day.isPast && cell.slot ? 'opacity-75 hover:opacity-100' : '',
+            ]"
             :style="
               cell.slot
                 ? {
@@ -115,10 +122,15 @@ function visualFor(recipeId: string) {
               <span
                 class="mt-auto rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-ink-soft tabular-nums"
               >
-                {{ cell.slot.servings }} portion(s)
+                👥 {{ cell.slot.servings }} pers.
               </span>
             </template>
-            <span v-else class="text-[13px] text-ink-faint">+ Ajouter</span>
+            <span
+              v-else
+              class="text-[13px] text-ink-faint transition-colors group-hover:text-olive-600"
+            >
+              + Ajouter
+            </span>
           </button>
         </div>
       </div>

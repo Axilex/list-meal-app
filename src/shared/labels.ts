@@ -31,3 +31,8 @@ export const STEP_ACTIONS: { action: string; emoji: string }[] = [
 export function stepActionEmoji(action: string): string | undefined {
   return STEP_ACTIONS.find((a) => a.action === action)?.emoji
 }
+
+/** « 1 portion », « 2 portions » — pluriel simple en s. */
+export function countLabel(count: number, singular: string): string {
+  return `${count} ${singular}${count > 1 ? 's' : ''}`
+}

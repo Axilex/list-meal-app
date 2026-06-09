@@ -5,6 +5,8 @@ const props = defineProps<{
   variant?: Variant
   type?: 'button' | 'submit'
   disabled?: boolean
+  /** 'sm' pour les actions compactes (cartes, listes). */
+  size?: 'sm' | 'md'
 }>()
 
 const variantClasses: Record<Variant, string> = {
@@ -18,14 +20,19 @@ const variantClasses: Record<Variant, string> = {
   ghost:
     'border-2 border-transparent text-ink-soft hover:bg-olive-50 hover:text-olive-700 active:scale-95',
 }
+
+const sizeClasses = {
+  sm: 'px-3.5 py-1.5 text-[13px]',
+  md: 'px-5 py-2.5 text-sm',
+}
 </script>
 
 <template>
   <button
     :type="props.type ?? 'button'"
     :disabled="disabled"
-    class="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-5 py-2.5 font-display text-sm font-bold transition-all duration-150 ease-pop focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive-500 disabled:cursor-not-allowed disabled:opacity-45"
-    :class="variantClasses[variant ?? 'secondary']"
+    class="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full font-display font-bold transition-all duration-150 ease-pop focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-olive-500 disabled:cursor-not-allowed disabled:opacity-45"
+    :class="[variantClasses[variant ?? 'secondary'], sizeClasses[size ?? 'md']]"
   >
     <slot />
   </button>

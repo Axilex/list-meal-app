@@ -218,5 +218,6 @@ When the user corrects your approach, append a one-line rule here before ending 
 - Never `structuredClone` a Vue prop or anything read from a `ref`/`reactive`: it's a reactive Proxy and throws `DataCloneError` at runtime (typecheck and tests won't catch it). Copy with spread/`.map` instead.
 - UI design: the user finds monochrome/pale palettes too bland (rejected two single-accent passes). The validated language is "pop ludique, riche mais maîtrisé": candy colors + emoji on components, sober backgrounds, few animations — see `src/ui/recipeVisual.ts` and the tokens in `src/style.css`.
 - The `olive-*` tokens in `src/style.css` hold the **coral** primary scale (historical name kept to avoid churning ~30 class occurrences); do not reintroduce green values under that name.
+- Vitest loads `.env.local` even in test mode: the `test.env` block in `vite.config.ts` blanks `VITE_FIREBASE_*` so tests stay on the localStorage repositories — do not remove it.
 
 ---

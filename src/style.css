@@ -67,6 +67,18 @@
 @layer base {
   body {
     @apply bg-paper font-body text-ink antialiased;
+    /* Atmosphère : deux halos chauds + semis de pois discret sur fond crème */
+    background-image:
+      radial-gradient(560px 360px at 8% -4%, rgba(255, 98, 71, 0.07), transparent 70%),
+      radial-gradient(640px 420px at 100% 0%, rgba(255, 158, 44, 0.07), transparent 70%),
+      radial-gradient(700px 520px at 50% 115%, rgba(31, 199, 158, 0.05), transparent 70%),
+      radial-gradient(rgba(36, 31, 49, 0.035) 1px, transparent 1.2px);
+    background-size:
+      100% 100%,
+      100% 100%,
+      100% 100%,
+      22px 22px;
+    background-attachment: fixed;
   }
 
   ::selection {
@@ -89,6 +101,17 @@
   .nav-link.router-link-exact-active {
     @apply bg-olive-500 text-white;
     box-shadow: 0 2px 0 var(--color-olive-700);
+  }
+
+  /* Onglet de la barre mobile */
+  .tab-link {
+    @apply flex flex-col items-center gap-0.5 rounded-2xl px-2 py-1.5 text-[11px] font-bold text-ink-soft transition-all duration-150;
+    font-family: var(--font-display);
+    transition-timing-function: var(--ease-pop);
+  }
+
+  .tab-link.router-link-exact-active {
+    @apply bg-olive-100 text-olive-700;
   }
 
   /* Pastille type de repas (midi / soir) */
@@ -126,6 +149,13 @@
     @apply border-olive-600 bg-olive-500 bg-center bg-no-repeat;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round' d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E");
     background-size: 13px 13px;
+    animation: check-pop 240ms var(--ease-pop);
+  }
+
+  /* Bouton icône rond (flèches de semaine, déconnexion, suppression…) */
+  .icon-btn {
+    @apply grid size-10 cursor-pointer place-items-center rounded-full border border-line bg-cream text-ink-soft shadow-soft transition-all duration-150 hover:-translate-y-0.5 hover:border-olive-300 hover:bg-olive-50 hover:text-olive-700;
+    transition-timing-function: var(--ease-pop);
   }
 }
 
@@ -159,6 +189,93 @@
   animation: modal-rise 260ms var(--ease-pop);
 }
 
+/* Rebond de la case cochée */
+@keyframes check-pop {
+  0% {
+    transform: scale(0.7);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Toast : surgit du bas puis se retire */
+@keyframes toast-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast-enter-active {
+  animation: toast-rise 240ms var(--ease-pop);
+}
+
+.toast-leave-active {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.toast-leave-to {
+  opacity: 0;
+  transform: translateY(8px) scale(0.97);
+}
+
+/* Transition entre pages : fondu + léger glissement */
+.page-enter-active {
+  transition: opacity 180ms ease-out, transform 220ms var(--ease-pop);
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+/* Glissement directionnel du calendrier au changement de semaine */
+.week-next-enter-active,
+.week-prev-enter-active {
+  transition: opacity 200ms ease-out, transform 240ms var(--ease-pop);
+}
+
+.week-next-enter-from {
+  opacity: 0;
+  transform: translateX(36px);
+}
+
+.week-prev-enter-from {
+  opacity: 0;
+  transform: translateX(-36px);
+}
+
+/* Squelettes de chargement */
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.skeleton {
+  @apply rounded-2xl bg-ink/8;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+/* Accessibilité : couper transformations et animations décoratives */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @media print {
   .no-print {
     display: none !important;
@@ -166,5 +283,10 @@
 
   body {
     background: white;
+    background-image: none;
+  }
+
+  .print-avoid-break {
+    break-inside: avoid;
   }
 }

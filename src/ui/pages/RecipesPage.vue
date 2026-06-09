@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import type { Recipe, RecipeDraft } from '@/domain/models'
+import { countLabel } from '@/shared/labels'
 import { useUseCases } from '@/ui/di'
+import { showToast } from '@/ui/toast'
 import BaseButton from '@/ui/components/base/BaseButton.vue'
 import BaseCard from '@/ui/components/base/BaseCard.vue'
+import ConfirmModal from '@/ui/components/base/ConfirmModal.vue'
 import RecipeForm from '@/ui/components/RecipeForm.vue'
 import RecipeList from '@/ui/components/RecipeList.vue'
 import RecipePreviewModal from '@/ui/components/RecipePreviewModal.vue'
@@ -19,8 +22,21 @@ const ingredientNames = computed(() =>
 )
 const editing = ref<RecipeDraft | null>(null)
 const previewing = ref<Recipe | null>(null)
+const deleting = ref<Recipe | null>(null)
 const formErrors = ref<string[]>([])
 const loaded = ref(false)
+const search = ref('')
+
+// Recherche insensible aux accents et à la casse (« pates » trouve « Pâtes »)
+function normalize(value: string): string {
+  return value.trim().toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
+}
+
+const filteredRecipes = computed(() => {
+  const query = normalize(search.value)
+  if (!query) return recipes.value
+  return recipes.value.filter((r) => normalize(r.name).includes(query))
+})
 
 async function reload() {
   recipes.value = await getRecipes.execute()
@@ -66,22 +82,22 @@ function startEdit(recipe: Recipe) {
 async function handleSave(draft: RecipeDraft) {
   const result = await saveRecipe.execute(draft)
   if (result.ok) {
+    const created = !draft.id
     editing.value = null
     formErrors.value = []
     await reload()
+    showToast(created ? 'Recette ajoutée au carnet' : 'Recette mise à jour', '✅')
   } else {
     formErrors.value = result.errors
   }
 }
 
-async function handleDelete(recipe: Recipe) {
-  const confirmed = confirm(
-    `Supprimer la recette « ${recipe.name} » ?\n` +
-      'Les repas planifiés avec cette recette seront retirés du plan.',
-  )
-  if (!confirmed) return
-  await deleteRecipe.execute(recipe.id)
+async function confirmDelete() {
+  if (!deleting.value) return
+  await deleteRecipe.execute(deleting.value.id)
+  deleting.value = null
   await reload()
+  showToast('Recette supprimée', '🗑️')
 }
 </script>
 
@@ -100,21 +116,44 @@ async function handleDelete(recipe: Recipe) {
 
     <template v-else>
       <div class="flex flex-wrap items-center gap-3">
-        <h1
-          class="mr-auto flex items-center gap-3 font-display text-[28px] font-extrabold tracking-tight"
-        >
+        <div class="mr-auto flex items-center gap-3">
           <span
             class="grid size-12 place-items-center rounded-2xl bg-olive-100 text-[22px] shadow-soft"
             aria-hidden="true"
           >
             📖
           </span>
-          Recettes
-        </h1>
+          <div>
+            <h1 class="font-display text-[28px] font-extrabold tracking-tight">
+              Recettes
+            </h1>
+            <p v-if="recipes.length > 0" class="text-[13px] text-ink-soft tabular-nums">
+              {{ countLabel(recipes.length, 'recette') }} au carnet
+            </p>
+            <p v-else class="text-[13px] text-ink-soft">Votre carnet de cuisine</p>
+          </div>
+        </div>
         <BaseButton variant="primary" @click="startCreate">
           Ajouter une recette
         </BaseButton>
       </div>
+
+      <!-- Recherche dès que le carnet s'étoffe -->
+      <label v-if="recipes.length >= 4" class="relative block sm:max-w-xs">
+        <span
+          class="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2"
+          aria-hidden="true"
+        >
+          🔍
+        </span>
+        <input
+          v-model="search"
+          type="search"
+          placeholder="Chercher une recette…"
+          aria-label="Chercher une recette"
+          class="field-control pl-11"
+        />
+      </label>
 
       <BaseCard v-if="loaded && recipes.length === 0" class="py-14 text-center">
         <div
@@ -130,12 +169,27 @@ async function handleDelete(recipe: Recipe) {
         </p>
       </BaseCard>
 
+      <!-- Squelette pendant le chargement (latence Firestore) -->
+      <div v-else-if="!loaded" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div v-for="i in 6" :key="i" class="skeleton h-52 !rounded-[28px]"></div>
+      </div>
+
+      <BaseCard
+        v-else-if="filteredRecipes.length === 0"
+        class="py-10 text-center"
+      >
+        <p class="text-3xl" aria-hidden="true">🤷</p>
+        <p class="mt-3 text-ink-soft">
+          Aucune recette ne correspond à « {{ search }} ».
+        </p>
+      </BaseCard>
+
       <RecipeList
         v-else
-        :recipes="recipes"
+        :recipes="filteredRecipes"
         @preview="previewing = $event"
         @edit="startEdit"
-        @delete="handleDelete"
+        @delete="deleting = $event"
       />
 
       <RecipePreviewModal
@@ -144,6 +198,17 @@ async function handleDelete(recipe: Recipe) {
         :ingredient-name-by-id="ingredientNameById"
         @edit="startEdit"
         @close="previewing = null"
+      />
+
+      <ConfirmModal
+        v-if="deleting"
+        :title="`Supprimer « ${deleting.name} » ?`"
+        message="Les repas planifiés avec cette recette seront retirés du plan."
+        confirm-label="Supprimer"
+        emoji="🗑️"
+        danger
+        @confirm="confirmDelete"
+        @close="deleting = null"
       />
     </template>
   </div>

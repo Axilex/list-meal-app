@@ -15,5 +15,11 @@ export default defineConfig({
     // Tests de domaine/application en node ; les tests UI déclarent
     // `// @vitest-environment jsdom` en tête de fichier.
     environment: 'node',
+    // Les tests exercent le mode localStorage : on neutralise la config
+    // Firebase que Vitest lirait sinon dans .env.local (mode test inclus).
+    env: {
+      VITE_FIREBASE_API_KEY: '',
+      VITE_FIREBASE_PROJECT_ID: '',
+    },
   },
 })

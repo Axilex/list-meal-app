@@ -10,8 +10,10 @@ import {
   todayIso,
 } from '@/shared/date'
 import { useUseCases } from '@/ui/di'
+import { showToast } from '@/ui/toast'
 import BaseButton from '@/ui/components/base/BaseButton.vue'
 import BaseCard from '@/ui/components/base/BaseCard.vue'
+import ConfirmModal from '@/ui/components/base/ConfirmModal.vue'
 import ShoppingListView from '@/ui/components/ShoppingListView.vue'
 
 const { getCurrentShoppingList, generateShoppingList, toggleShoppingItem } =
@@ -20,10 +22,36 @@ const route = useRoute()
 
 const list = ref<ShoppingList | null>(null)
 const loaded = ref(false)
+const confirmingRegenerate = ref(false)
 
 const checkedCount = computed(
   () => list.value?.items.filter((item) => item.checked).length ?? 0,
 )
+
+const progress = computed(() =>
+  list.value && list.value.items.length > 0
+    ? checkedCount.value / list.value.items.length
+    : 0,
+)
+
+const remaining = computed(
+  () => (list.value?.items.length ?? 0) - checkedCount.value,
+)
+
+const remainingLabel = computed(() =>
+  remaining.value > 1
+    ? 'articles restants à acheter'
+    : 'article restant à acheter',
+)
+
+const regenerateMessage = computed(() => {
+  const n = checkedCount.value
+  const checked =
+    n > 1
+      ? `vos ${n} articles cochés seront décochés`
+      : 'votre article coché sera décoché'
+  return `La liste sera recalculée depuis le plan de repas et ${checked}.`
+})
 
 const weekLabel = computed(() =>
   list.value
@@ -58,10 +86,18 @@ onMounted(async () => {
   loaded.value = true
 })
 
+// Regénérer décoche tout : on prévient si des articles sont déjà cochés
+function requestRegenerate() {
+  if (checkedCount.value > 0) confirmingRegenerate.value = true
+  else void regenerate()
+}
+
 async function regenerate() {
+  confirmingRegenerate.value = false
   list.value = await generateShoppingList.execute(
     list.value?.weekStart ?? mondayOf(todayIso()),
   )
+  showToast('Liste regénérée depuis le plan', '🔄')
 }
 
 async function handleToggle(item: ShoppingListItem, checked: boolean) {
@@ -99,7 +135,7 @@ function printList() {
         </div>
       </div>
       <div class="no-print flex gap-2">
-        <BaseButton variant="secondary" @click="regenerate">Regénérer</BaseButton>
+        <BaseButton variant="secondary" @click="requestRegenerate">Regénérer</BaseButton>
         <BaseButton
           variant="primary"
           :disabled="!list || list.items.length === 0"
@@ -110,8 +146,19 @@ function printList() {
       </div>
     </div>
 
+    <!-- Squelette pendant le chargement (latence Firestore) -->
+    <div
+      v-if="!loaded"
+      class="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_290px]"
+    >
+      <div class="space-y-3 rounded-[28px] border border-line bg-cream p-5 shadow-soft">
+        <div v-for="i in 8" :key="i" class="skeleton h-9"></div>
+      </div>
+      <div class="skeleton order-first h-44 !rounded-[28px] lg:order-none"></div>
+    </div>
+
     <BaseCard
-      v-if="loaded && (!list || list.items.length === 0)"
+      v-else-if="!list || list.items.length === 0"
       class="py-14 text-center"
     >
       <div
@@ -134,7 +181,7 @@ function printList() {
 
     <!-- Desktop : liste à gauche, résumé en aside ; mobile : résumé au-dessus -->
     <div
-      v-else-if="list"
+      v-else
       class="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_290px]"
     >
       <ShoppingListView :list="list" @toggle="handleToggle" />
@@ -146,22 +193,17 @@ function printList() {
         <p
           class="mt-3 font-display text-[36px] font-extrabold leading-none tracking-tight"
         >
-          {{ list.items.length - checkedCount }}
+          {{ remaining }}
         </p>
-        <p class="mt-1 text-[13px] text-ink-soft">article(s) restant(s) à acheter</p>
+        <p class="mt-1 text-[13px] text-ink-soft">{{ remainingLabel }}</p>
         <div class="mt-4 h-2.5 overflow-hidden rounded-full bg-paper">
           <div
             class="h-full rounded-full bg-gradient-to-r from-tangerine-400 to-olive-500 transition-all duration-300"
-            :style="{
-              width:
-                list.items.length > 0
-                  ? `${(checkedCount / list.items.length) * 100}%`
-                  : '0%',
-            }"
+            :style="{ width: `${progress * 100}%` }"
           ></div>
         </div>
         <p class="mt-2 text-[12px] font-medium text-ink-soft tabular-nums">
-          {{ checkedCount }}/{{ list.items.length }} coché(s)
+          {{ checkedCount }}/{{ list.items.length }} dans le panier
         </p>
         <p
           v-if="checkedCount === list.items.length"
@@ -171,5 +213,15 @@ function printList() {
         </p>
       </aside>
     </div>
+
+    <ConfirmModal
+      v-if="confirmingRegenerate"
+      title="Regénérer la liste ?"
+      :message="regenerateMessage"
+      confirm-label="Oui, regénérer"
+      emoji="🔄"
+      @confirm="regenerate"
+      @close="confirmingRegenerate = false"
+    />
   </div>
 </template>

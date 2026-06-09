@@ -120,8 +120,13 @@ describe('intégration UI ↔ use cases ↔ localStorage', () => {
     const checkbox = reloaded.find('input[type="checkbox"]')
     expect((checkbox.element as HTMLInputElement).checked).toBe(true)
 
-    // « Regénérer » remet les coches à zéro
+    // « Regénérer » avec des coches demande confirmation, puis remet à zéro
     await reloaded.findAll('button').find((b) => b.text() === 'Regénérer')!.trigger('click')
+    await flushPromises()
+    await reloaded
+      .findAll('button')
+      .find((b) => b.text() === 'Oui, regénérer')!
+      .trigger('click')
     await flushPromises()
     expect(
       (reloaded.find('input[type="checkbox"]').element as HTMLInputElement).checked,

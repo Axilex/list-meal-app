@@ -2,7 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { MealPlan, MealSlot, MealType, Recipe } from '@/domain/models'
-import { addDays, formatShortDate, mondayOf, todayIso } from '@/shared/date'
+import { addDays, formatShortDate, mondayOf, todayIso, weekDates } from '@/shared/date'
+import { countLabel } from '@/shared/labels'
 import { useUseCases } from '@/ui/di'
 import BaseButton from '@/ui/components/base/BaseButton.vue'
 import BaseCard from '@/ui/components/base/BaseCard.vue'
@@ -18,17 +19,26 @@ const {
 } = useUseCases()
 const router = useRouter()
 
-const weekStart = ref(mondayOf(todayIso()))
+const currentMonday = mondayOf(todayIso())
+const weekStart = ref(currentMonday)
 const plan = ref<MealPlan | null>(null)
 const recipes = ref<Recipe[]>([])
 const ingredientNameById = ref(new Map<string, string>())
 const loaded = ref(false)
 const editing = ref<{ date: string; mealType: MealType } | null>(null)
+// Sens du glissement quand on change de semaine ('next' | 'prev')
+const weekDirection = ref<'next' | 'prev'>('next')
 
 const weekLabel = computed(
   () =>
-    `Semaine du ${formatShortDate(weekStart.value)} au ${formatShortDate(addDays(weekStart.value, 6))}`,
+    `du ${formatShortDate(weekStart.value)} au ${formatShortDate(addDays(weekStart.value, 6))}`,
 )
+
+// Repas planifiés sur la semaine affichée (sur 14 créneaux possibles)
+const plannedCount = computed(() => {
+  const dates = new Set(weekDates(weekStart.value))
+  return (plan.value?.slots ?? []).filter((s) => dates.has(s.date)).length
+})
 
 const editingSlot = computed<MealSlot | null>(() => {
   if (!editing.value || !plan.value) return null
@@ -48,6 +58,16 @@ onMounted(async () => {
   ingredientNameById.value = new Map(ingredients.map((i) => [i.id, i.name]))
   loaded.value = true
 })
+
+function shiftWeek(direction: 1 | -1) {
+  weekDirection.value = direction === 1 ? 'next' : 'prev'
+  weekStart.value = addDays(weekStart.value, direction * 7)
+}
+
+function goToCurrentWeek() {
+  weekDirection.value = weekStart.value > currentMonday ? 'prev' : 'next'
+  weekStart.value = currentMonday
+}
 
 async function handleSave(slot: MealSlot) {
   const result = await saveMealSlot.execute(slot)
@@ -71,44 +91,65 @@ function goToShoppingList() {
 <template>
   <div class="space-y-5">
     <div class="flex flex-wrap items-center gap-3">
-      <h1
-        class="mr-auto flex items-center gap-3 font-display text-[28px] font-extrabold tracking-tight"
-      >
+      <div class="mr-auto flex items-center gap-3">
         <span
           class="grid size-12 place-items-center rounded-2xl bg-olive-100 text-[22px] shadow-soft"
           aria-hidden="true"
         >
           📅
         </span>
-        Plan de repas
-      </h1>
+        <div>
+          <h1 class="font-display text-[28px] font-extrabold tracking-tight">
+            Plan de repas
+          </h1>
+          <p class="text-[13px] text-ink-soft">
+            Choisissez les recettes de la semaine, la liste de courses suit.
+          </p>
+        </div>
+      </div>
       <BaseButton variant="primary" @click="goToShoppingList">
         Liste de courses →
       </BaseButton>
     </div>
 
-    <div class="flex items-center justify-center gap-4">
+    <!-- Barre de semaine : navigation + retour à aujourd'hui + progression -->
+    <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
       <button
         type="button"
         title="Semaine précédente"
         aria-label="Semaine précédente"
-        class="grid size-10 cursor-pointer place-items-center rounded-full border border-line bg-cream text-ink-soft shadow-soft transition-all duration-150 ease-pop hover:-translate-y-0.5 hover:border-olive-300 hover:bg-olive-50 hover:text-olive-700"
-        @click="weekStart = addDays(weekStart, -7)"
+        class="icon-btn"
+        @click="shiftWeek(-1)"
       >
         ‹
       </button>
-      <span class="min-w-56 text-center font-display text-[16px] font-bold text-ink">
-        {{ weekLabel }}
+      <span class="text-center font-display leading-tight font-bold text-ink">
+        <span class="block text-[11px] tracking-[0.1em] text-ink-faint uppercase">Semaine</span>
+        <span class="block text-[16px]">{{ weekLabel }}</span>
       </span>
       <button
         type="button"
         title="Semaine suivante"
         aria-label="Semaine suivante"
-        class="grid size-10 cursor-pointer place-items-center rounded-full border border-line bg-cream text-ink-soft shadow-soft transition-all duration-150 ease-pop hover:-translate-y-0.5 hover:border-olive-300 hover:bg-olive-50 hover:text-olive-700"
-        @click="weekStart = addDays(weekStart, 7)"
+        class="icon-btn"
+        @click="shiftWeek(1)"
       >
         ›
       </button>
+      <button
+        v-if="weekStart !== currentMonday"
+        type="button"
+        class="meal-badge cursor-pointer border border-olive-200 bg-olive-50 !text-[11px] text-olive-700 transition-colors hover:bg-olive-100"
+        @click="goToCurrentWeek"
+      >
+        ↩ Aujourd’hui
+      </button>
+      <span
+        v-else-if="plannedCount > 0"
+        class="meal-badge border border-line bg-cream !text-[11px] text-ink-soft tabular-nums"
+      >
+        🍽️ {{ countLabel(plannedCount, 'repas planifié') }}
+      </span>
     </div>
 
     <BaseCard v-if="loaded && recipes.length === 0" class="py-14 text-center">
@@ -130,13 +171,26 @@ function goToShoppingList() {
       </RouterLink>
     </BaseCard>
 
-    <MealPlanCalendar
-      v-else
-      :week-start="weekStart"
-      :plan="plan"
-      :recipes="recipes"
-      @edit-slot="(date, mealType) => (editing = { date, mealType })"
-    />
+    <!-- Squelette pendant le chargement (latence Firestore) -->
+    <div v-else-if="!loaded" class="rounded-[28px] border border-line bg-cream p-4 shadow-soft">
+      <div class="grid gap-3 min-[840px]:grid-cols-7">
+        <div v-for="i in 7" :key="i" class="space-y-2">
+          <div class="skeleton h-9"></div>
+          <div class="skeleton h-24"></div>
+          <div class="skeleton hidden h-24 min-[840px]:block"></div>
+        </div>
+      </div>
+    </div>
+
+    <Transition v-else :name="`week-${weekDirection}`" mode="out-in">
+      <MealPlanCalendar
+        :key="weekStart"
+        :week-start="weekStart"
+        :plan="plan"
+        :recipes="recipes"
+        @edit-slot="(date, mealType) => (editing = { date, mealType })"
+      />
+    </Transition>
 
     <MealSlotModal
       v-if="editing"
