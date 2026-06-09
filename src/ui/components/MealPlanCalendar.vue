@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { MealPlan, MealSlot, MealType, Recipe } from '@/domain/models'
 import { formatShortDate, formatWeekday, todayIso, weekDates } from '@/shared/date'
+import { isVacationDay } from '@/shared/vacations'
 import MealBadge from '@/ui/components/MealBadge.vue'
 import { recipeVisual } from '@/ui/recipeVisual'
 
@@ -31,6 +32,7 @@ const days = computed(() =>
     date,
     isPast: date < today,
     isWeekend: index >= 5,
+    isVacation: isVacationDay(date),
     cells: MEAL_TYPES.map((mealType) => ({
       mealType,
       slot: slotByCell.value.get(`${date}|${mealType}`) ?? null,
@@ -61,9 +63,11 @@ function visualFor(recipeId: string) {
             : '',
           day.date === today
             ? 'bg-gradient-to-b from-olive-50 via-olive-50/40 to-transparent'
-            : day.isWeekend
-              ? 'bg-paper/50'
-              : '',
+            : day.isVacation
+              ? 'bg-lagoon-50/50'
+              : day.isWeekend
+                ? 'bg-paper/50'
+                : '',
         ]"
       >
         <div
@@ -84,6 +88,12 @@ function visualFor(recipeId: string) {
             class="meal-badge bg-olive-500 text-white min-[840px]:mt-1"
           >
             aujourd’hui
+          </div>
+          <div
+            v-if="day.isVacation"
+            class="meal-badge bg-lagoon-50 text-lagoon-700 min-[840px]:mt-1"
+          >
+            🏖️ vacances
           </div>
         </div>
 

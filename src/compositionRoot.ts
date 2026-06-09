@@ -29,6 +29,7 @@ import {
   SaveMealSlotUseCase,
   SaveRecipeUseCase,
   ToggleShoppingItemUseCase,
+  UncheckAllShoppingItemsUseCase,
 } from './application/usecases'
 import type { UseCases } from './ui/di'
 
@@ -83,5 +84,6 @@ export function createUseCases(): UseCases {
     ),
     getCurrentShoppingList: new GetCurrentShoppingListUseCase(shoppingListRepo),
     toggleShoppingItem: new ToggleShoppingItemUseCase(shoppingListRepo),
+    uncheckAllShoppingItems: new UncheckAllShoppingItemsUseCase(shoppingListRepo),
   }
 }

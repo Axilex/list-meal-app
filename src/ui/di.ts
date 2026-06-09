@@ -11,6 +11,7 @@ import type {
   SaveMealSlotUseCase,
   SaveRecipeUseCase,
   ToggleShoppingItemUseCase,
+  UncheckAllShoppingItemsUseCase,
 } from '@/application/usecases'
 
 // La UI ne connaît que les use cases ; les implémentations concrètes
@@ -26,6 +27,7 @@ export interface UseCases {
   generateShoppingList: GenerateShoppingListUseCase
   getCurrentShoppingList: GetCurrentShoppingListUseCase
   toggleShoppingItem: ToggleShoppingItemUseCase
+  uncheckAllShoppingItems: UncheckAllShoppingItemsUseCase
 }
 
 export const USE_CASES: InjectionKey<UseCases> = Symbol('useCases')

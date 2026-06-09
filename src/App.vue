@@ -4,6 +4,7 @@ import { RouterLink, RouterView } from 'vue-router'
 import type { AuthUser } from '@/application/auth/AuthGateway'
 import { useAuthGateway } from '@/ui/di'
 import LoginPage from '@/ui/pages/LoginPage.vue'
+import ConfirmModal from '@/ui/components/base/ConfirmModal.vue'
 import ToastHost from '@/ui/components/base/ToastHost.vue'
 
 const auth = useAuthGateway()
@@ -33,7 +34,12 @@ const NAV_ITEMS = [
   { to: '/shopping-list', emoji: '🛒', label: 'Liste de courses', short: 'Courses' },
 ]
 
+// Confirmation avant déconnexion : un clic accidentel ne doit pas
+// renvoyer à l'écran de connexion sans prévenir.
+const confirmingSignOut = ref(false)
+
 async function handleSignOut() {
+  confirmingSignOut.value = false
   await auth?.signOut()
 }
 </script>
@@ -78,7 +84,7 @@ async function handleSignOut() {
           title="Déconnexion"
           aria-label="Déconnexion"
           class="icon-btn ml-1 size-9 text-sm"
-          @click="handleSignOut"
+          @click="confirmingSignOut = true"
         >
           ⏻
         </button>
@@ -120,6 +126,16 @@ async function handleSignOut() {
         </RouterLink>
       </div>
     </nav>
+
+    <ConfirmModal
+      v-if="confirmingSignOut"
+      title="Se déconnecter ?"
+      message="Il faudra saisir à nouveau l'email et le mot de passe pour revenir."
+      confirm-label="Se déconnecter"
+      emoji="👋"
+      @confirm="handleSignOut"
+      @close="confirmingSignOut = false"
+    />
 
     <ToastHost />
   </div>

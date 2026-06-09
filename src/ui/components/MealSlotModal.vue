@@ -147,7 +147,7 @@ function save() {
         class="mr-auto"
         @click="emit('remove', slot.id)"
       >
-        Retirer
+        Retirer ce repas
       </BaseButton>
       <BaseButton variant="secondary" @click="emit('close')">Annuler</BaseButton>
       <BaseButton

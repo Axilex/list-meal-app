@@ -16,13 +16,17 @@ import BaseCard from '@/ui/components/base/BaseCard.vue'
 import ConfirmModal from '@/ui/components/base/ConfirmModal.vue'
 import ShoppingListView from '@/ui/components/ShoppingListView.vue'
 
-const { getCurrentShoppingList, generateShoppingList, toggleShoppingItem } =
-  useUseCases()
+const {
+  getCurrentShoppingList,
+  generateShoppingList,
+  toggleShoppingItem,
+  uncheckAllShoppingItems,
+} = useUseCases()
 const route = useRoute()
 
 const list = ref<ShoppingList | null>(null)
 const loaded = ref(false)
-const confirmingRegenerate = ref(false)
+const confirmingUncheckAll = ref(false)
 
 const checkedCount = computed(
   () => list.value?.items.filter((item) => item.checked).length ?? 0,
@@ -44,60 +48,38 @@ const remainingLabel = computed(() =>
     : 'article restant à acheter',
 )
 
-const regenerateMessage = computed(() => {
-  const n = checkedCount.value
-  const checked =
-    n > 1
-      ? `vos ${n} articles cochés seront décochés`
-      : 'votre article coché sera décoché'
-  return `La liste sera recalculée depuis le plan de repas et ${checked}.`
-})
-
 const weekLabel = computed(() =>
   list.value
     ? `Semaine du ${formatShortDate(list.value.weekStart)} au ${formatShortDate(addDays(list.value.weekStart, 6))}`
     : '',
 )
 
-const generatedAtLabel = computed(() =>
-  list.value
-    ? new Intl.DateTimeFormat('fr-FR', {
-        dateStyle: 'long',
-        timeStyle: 'short',
-      }).format(new Date(list.value.generatedAt))
-    : '',
-)
-
 onMounted(async () => {
+  // Semaine affichée : celle demandée (?week=), sinon celle de la liste
+  // persistée tant qu'elle n'est pas passée, sinon la semaine courante.
   const requestedWeek =
     typeof route.query.week === 'string' && isValidIsoDate(route.query.week)
       ? mondayOf(route.query.week)
       : null
+  const currentMonday = mondayOf(todayIso())
   const persisted = await getCurrentShoppingList.execute()
+  const weekStart =
+    requestedWeek ??
+    (persisted && persisted.weekStart >= currentMonday
+      ? persisted.weekStart
+      : currentMonday)
 
-  // Liste persistée réutilisée (coches conservées) sauf si une autre semaine est demandée
-  if (persisted && (requestedWeek === null || persisted.weekStart === requestedWeek)) {
-    list.value = persisted
-  } else {
-    list.value = await generateShoppingList.execute(
-      requestedWeek ?? mondayOf(todayIso()),
-    )
-  }
+  // Toujours recalculée depuis le plan : la liste reste à jour sans bouton,
+  // les coches de la même semaine sont conservées par le use case.
+  list.value = await generateShoppingList.execute(weekStart)
   loaded.value = true
 })
 
-// Regénérer décoche tout : on prévient si des articles sont déjà cochés
-function requestRegenerate() {
-  if (checkedCount.value > 0) confirmingRegenerate.value = true
-  else void regenerate()
-}
-
-async function regenerate() {
-  confirmingRegenerate.value = false
-  list.value = await generateShoppingList.execute(
-    list.value?.weekStart ?? mondayOf(todayIso()),
-  )
-  showToast('Liste regénérée depuis le plan', '🔄')
+async function uncheckAll() {
+  confirmingUncheckAll.value = false
+  const updated = await uncheckAllShoppingItems.execute()
+  if (updated) list.value = updated
+  showToast('Tous les articles sont à nouveau à acheter', '🧺')
 }
 
 async function handleToggle(item: ShoppingListItem, checked: boolean) {
@@ -119,23 +101,29 @@ function printList() {
     <div class="flex flex-wrap items-center gap-3">
       <div class="mr-auto flex items-center gap-3">
         <span
-          class="grid size-12 place-items-center rounded-2xl bg-olive-100 text-[22px] shadow-soft"
+          class="no-print grid size-12 place-items-center rounded-2xl bg-olive-100 text-[22px] shadow-soft"
           aria-hidden="true"
         >
           🛒
         </span>
         <div>
           <p v-if="list" class="eyebrow">{{ weekLabel }}</p>
-          <h1 class="font-display text-[28px] font-extrabold tracking-tight">
+          <h1 class="font-display text-[28px] font-extrabold tracking-tight print:text-[20pt]">
             Liste de courses
           </h1>
-          <p v-if="list" class="text-[13px] text-ink-soft">
-            Générée le {{ generatedAtLabel }}
+          <p class="no-print text-[13px] text-ink-soft">
+            Calculée automatiquement depuis votre plan de repas.
           </p>
         </div>
       </div>
       <div class="no-print flex gap-2">
-        <BaseButton variant="secondary" @click="requestRegenerate">Regénérer</BaseButton>
+        <BaseButton
+          v-if="checkedCount > 0"
+          variant="secondary"
+          @click="confirmingUncheckAll = true"
+        >
+          Tout décocher
+        </BaseButton>
         <BaseButton
           variant="primary"
           :disabled="!list || list.items.length === 0"
@@ -215,13 +203,13 @@ function printList() {
     </div>
 
     <ConfirmModal
-      v-if="confirmingRegenerate"
-      title="Regénérer la liste ?"
-      :message="regenerateMessage"
-      confirm-label="Oui, regénérer"
-      emoji="🔄"
-      @confirm="regenerate"
-      @close="confirmingRegenerate = false"
+      v-if="confirmingUncheckAll"
+      title="Tout décocher ?"
+      message="Tous les articles repasseront dans « À acheter »."
+      confirm-label="Oui, tout décocher"
+      emoji="🧺"
+      @confirm="uncheckAll"
+      @close="confirmingUncheckAll = false"
     />
   </div>
 </template>

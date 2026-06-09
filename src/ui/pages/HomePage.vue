@@ -182,7 +182,11 @@ function goToShoppingList() {
       </div>
     </div>
 
-    <Transition v-else :name="`week-${weekDirection}`" mode="out-in">
+    <!-- Pas de mode="out-in" : il se bloque (calendrier jamais réinséré) quand le
+         parent re-rend pendant la sortie, ce qui arrive à chaque changement de
+         semaine (barre de semaine recalculée). La sortie étant instantanée
+         (pas de classe leave), l'effet visuel reste un simple glissement d'entrée. -->
+    <Transition v-else :name="`week-${weekDirection}`">
       <MealPlanCalendar
         :key="weekStart"
         :week-start="weekStart"

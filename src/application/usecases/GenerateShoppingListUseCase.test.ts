@@ -45,6 +45,57 @@ describe('GenerateShoppingListUseCase', () => {
     expect(shoppingListRepo.list).toEqual(list)
   })
 
+  it('conserve les coches de la liste persistée de la même semaine', async () => {
+    const mealPlanRepo = new InMemoryMealPlanRepository({
+      id: 'plan-1',
+      name: 'Plan',
+      slots: [
+        { id: 's-1', date: '2026-06-01', mealType: 'lunch', recipeId: 'r-1', servings: 2 },
+      ],
+    })
+    const recipeRepo = new InMemoryRecipeRepository([
+      {
+        id: 'r-1',
+        name: 'Riz à la tomate',
+        servings: 2,
+        ingredients: [
+          { ingredientId: 'ing-1', quantity: 200, unit: 'g' },
+          { ingredientId: 'ing-2', quantity: 100, unit: 'g' },
+        ],
+      },
+    ])
+    const ingredientRepo = new InMemoryIngredientRepository([
+      { id: 'ing-1', name: 'Tomate', defaultUnit: 'g' },
+      { id: 'ing-2', name: 'Riz basmati', defaultUnit: 'g' },
+    ])
+    const shoppingListRepo = new InMemoryShoppingListRepository({
+      generatedAt: '2026-06-01T08:00:00.000Z',
+      weekStart: '2026-06-01',
+      items: [
+        { ingredientId: 'ing-1', name: 'Tomate', totalQuantity: 200, unit: 'g', checked: true },
+      ],
+    })
+    const useCase = new GenerateShoppingListUseCase(
+      mealPlanRepo,
+      recipeRepo,
+      ingredientRepo,
+      new ShoppingListService(),
+      shoppingListRepo,
+    )
+
+    const list = await useCase.execute('2026-06-01')
+
+    // La Tomate déjà cochée le reste ; le nouvel ingrédient arrive décoché
+    expect(list.items).toEqual([
+      expect.objectContaining({ name: 'Riz basmati', checked: false }),
+      expect.objectContaining({ name: 'Tomate', checked: true }),
+    ])
+
+    // Une autre semaine repart de zéro
+    const otherWeek = await useCase.execute('2026-06-08')
+    expect(otherWeek.items).toEqual([])
+  })
+
   it('retourne une liste vide quand aucun plan n’existe', async () => {
     const useCase = new GenerateShoppingListUseCase(
       new InMemoryMealPlanRepository(null),

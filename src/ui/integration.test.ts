@@ -30,6 +30,10 @@ async function mountApp(path: string, useCases: UseCases) {
     global: {
       plugins: [router],
       provide: { [USE_CASES as symbol]: useCases },
+      // Vraies <Transition> (VTU les stubbe par défaut), plus proche du
+      // navigateur. Le blocage de mode="out-in" (voir HomePage.vue) ne se
+      // reproduit toutefois pas en jsdom : la sortie s'y résout en synchrone.
+      stubs: { transition: false },
     },
   })
   await flushPromises()
@@ -73,6 +77,31 @@ describe('intégration UI ↔ use cases ↔ localStorage', () => {
       .map((o) => o.attributes('value'))
     expect(values).toContain('Tomate')
     expect(values).toContain('Riz basmati')
+  })
+
+  it('le calendrier reste affiché après un changement de semaine', async () => {
+    const useCases = createUseCases()
+    // Une recette pour que la grille s'affiche (sinon état vide)
+    const saved = await useCases.saveRecipe.execute({
+      name: 'Riz à la tomate',
+      servings: 2,
+      ingredients: [{ name: 'Tomate', quantity: 200, unit: 'g' }],
+    })
+    if (!saved.ok) throw new Error('création de recette attendue')
+
+    const home = await mountApp('/', useCases)
+    expect(home.text()).toContain('+ Ajouter')
+
+    // La grille doit rester rendue après chaque changement de semaine
+    // (un mode="out-in" sur la transition l'a déjà fait disparaître en
+    // navigateur réel — non reproductible en jsdom, vérifié visuellement).
+    await home.find('button[title="Semaine suivante"]').trigger('click')
+    await flushPromises()
+    expect(home.text()).toContain('+ Ajouter')
+
+    await home.find('button[title="Semaine précédente"]').trigger('click')
+    await flushPromises()
+    expect(home.text()).toContain('+ Ajouter')
   })
 
   it('parcours complet : recette → plan → liste agrégée → coche persistée', async () => {
@@ -120,16 +149,44 @@ describe('intégration UI ↔ use cases ↔ localStorage', () => {
     const checkbox = reloaded.find('input[type="checkbox"]')
     expect((checkbox.element as HTMLInputElement).checked).toBe(true)
 
-    // « Regénérer » avec des coches demande confirmation, puis remet à zéro
-    await reloaded.findAll('button').find((b) => b.text() === 'Regénérer')!.trigger('click')
+    // Le plan change : au retour sur la liste, elle suit automatiquement
+    // (nouvel ingrédient présent) et la coche existante est conservée
+    const saved2 = await useCases.saveRecipe.execute({
+      name: 'Salade verte',
+      servings: 2,
+      ingredients: [{ name: 'Laitue', quantity: 1, unit: 'piece' }],
+    })
+    if (!saved2.ok) throw new Error('création de recette attendue')
+    await useCases.saveMealSlot.execute({
+      id: 's-3',
+      date: addDays(monday, 2),
+      mealType: 'lunch',
+      recipeId: saved2.recipe.id,
+      servings: 2,
+    })
+
+    const synced = await mountApp('/shopping-list', useCases)
+    expect(synced.text()).toContain('Laitue')
+    // La Tomate cochée reste dans « Dans le panier »
+    expect(synced.text()).toContain('Dans le panier')
+    expect(
+      synced
+        .findAll('input[type="checkbox"]')
+        .filter((c) => (c.element as HTMLInputElement).checked),
+    ).toHaveLength(1)
+
+    // « Tout décocher » demande confirmation puis remet tout dans « À acheter »
+    await synced.findAll('button').find((b) => b.text() === 'Tout décocher')!.trigger('click')
     await flushPromises()
-    await reloaded
+    await synced
       .findAll('button')
-      .find((b) => b.text() === 'Oui, regénérer')!
+      .find((b) => b.text() === 'Oui, tout décocher')!
       .trigger('click')
     await flushPromises()
     expect(
-      (reloaded.find('input[type="checkbox"]').element as HTMLInputElement).checked,
-    ).toBe(false)
+      synced
+        .findAll('input[type="checkbox"]')
+        .every((c) => !(c.element as HTMLInputElement).checked),
+    ).toBe(true)
   })
 })

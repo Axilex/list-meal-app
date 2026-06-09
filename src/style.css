@@ -49,6 +49,10 @@
   --color-night-50: #efe6ff;
   --color-night-700: #5b2fc0;
 
+  /* Lagon (jours de vacances dans le calendrier) */
+  --color-lagoon-50: #e1f7f3;
+  --color-lagoon-700: #0a7a6b;
+
   /* Ombre diffuse chaude (cartes), halo corail au survol, ombre dure 3D (CTA) */
   --shadow-soft: 0 10px 30px rgba(120, 92, 64, 0.1);
   --shadow-lift:
@@ -276,6 +280,10 @@
   }
 }
 
+@page {
+  margin: 14mm;
+}
+
 @media print {
   .no-print {
     display: none !important;
@@ -288,5 +296,16 @@
 
   .print-avoid-break {
     break-inside: avoid;
+  }
+
+  /* Checklist façon markdown : case vide à cocher au stylo, encre noire */
+  .checkbox {
+    appearance: none !important;
+    width: 13pt;
+    height: 13pt;
+    border: 1.4pt solid var(--color-ink);
+    border-radius: 2.5pt;
+    background: white !important;
+    animation: none !important;
   }
 }
